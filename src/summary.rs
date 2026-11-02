@@ -44,8 +44,8 @@ pub struct MetricSummary {
 pub fn metric_summary(samples: &[RunSample], metric: Metric) -> MetricSummary {
     let mut values: Vec<f64> = samples.iter().filter_map(|s| metric.value(s)).collect();
 
-    let valid = values.len() as usize;
-    let total = samples.len() as usize;
+    let valid = values.len();
+    let total = samples.len();
     let min = values.iter().copied().reduce(f64::min);
     let max = values.iter().copied().reduce(f64::max);
     let med = median(&mut values);
