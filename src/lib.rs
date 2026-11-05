@@ -1,7 +1,9 @@
 pub mod measure;
+pub mod memory;
 pub mod perf;
 pub mod reader;
 pub mod runner;
 pub mod stats;
+pub mod summarize_all;
 pub mod summary;
 pub mod warmup;
