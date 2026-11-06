@@ -8,6 +8,7 @@ pub struct Summary {
     pub cache_misses: MetricSummary,
     pub branch_misses: MetricSummary,
     pub wall_ms: MetricSummary,
+    pub peak_rss_kb: MetricSummary,
 }
 pub fn summarize_all(s: &[RunSample]) -> Summary {
     Summary {
@@ -16,6 +17,7 @@ pub fn summarize_all(s: &[RunSample]) -> Summary {
         cache_misses: metric_summary(s, Metric::CacheMisses),
         branch_misses: metric_summary(s, Metric::BranchMisses),
         wall_ms: metric_summary(s, Metric::WallMs),
+        peak_rss_kb: metric_summary(s, Metric::PeakRssKb),
     }
 }
 #[cfg(test)]
@@ -28,6 +30,7 @@ mod tests {
             instructions: Some(100),
             cache_misses: Some(10),
             branch_misses: Some(5),
+            peak_rss_kb: Some(1000),
             wall_ms,
         }
     }
@@ -38,6 +41,7 @@ mod tests {
             instructions: Some(cycles * 2),
             cache_misses: Some(cycles / 10),
             branch_misses: Some(cycles / 100),
+            peak_rss_kb: Some(cycles / 2),
             wall_ms: cycles as f64,
         }
     }
@@ -62,11 +66,12 @@ mod tests {
             metric_summary(&samples, Metric::BranchMisses)
         );
         assert_eq!(s.wall_ms, metric_summary(&samples, Metric::WallMs));
+        assert_eq!(s.peak_rss_kb, metric_summary(&samples, Metric::PeakRssKb));
     }
 
     #[test]
     fn fields_are_not_swapped() {
-        // Instructions are always twice cycles in full(), so swapped fields would show up here.
+        // full() derives every counter from cycles, so swapped fields would show up here.
         let samples = vec![full(100), full(200), full(300)];
         let s = summarize_all(&samples);
         assert_eq!(s.cycles.median, Some(200.0));
@@ -74,11 +79,12 @@ mod tests {
         assert_eq!(s.cache_misses.median, Some(20.0));
         assert_eq!(s.branch_misses.median, Some(2.0));
         assert_eq!(s.wall_ms.median, Some(200.0));
+        assert_eq!(s.peak_rss_kb.median, Some(100.0));
     }
 
     #[test]
     fn valid_and_total_are_per_metric() {
-        // Cycles is missing in one run, but the other counters are present in every run.
+        // Cycles is missing in one run, but the other metrics are present in every run.
         let samples = vec![full(100), sample(None, 5.0), full(300)];
         let s = summarize_all(&samples);
         assert_eq!(s.cycles.valid, 2);
@@ -86,6 +92,7 @@ mod tests {
         assert_eq!(s.instructions.valid, 3);
         assert_eq!(s.instructions.total, 3);
         assert_eq!(s.wall_ms.valid, 3);
+        assert_eq!(s.peak_rss_kb.valid, 3);
     }
 
     #[test]
@@ -97,6 +104,7 @@ mod tests {
         assert_eq!(s.instructions.valid, 2);
         assert_eq!(s.instructions.median, Some(100.0));
         assert_eq!(s.wall_ms.median, Some(1.5));
+        assert_eq!(s.peak_rss_kb.median, Some(1000.0));
     }
 
     #[test]
@@ -107,6 +115,7 @@ mod tests {
         assert_eq!(s.cache_misses.median, Some(4.0));
         assert_eq!(s.branch_misses.median, Some(0.0));
         assert_eq!(s.wall_ms.median, Some(40.0));
+        assert_eq!(s.peak_rss_kb.median, Some(20.0));
         assert_eq!(s.cycles.valid, 1);
         assert_eq!(s.wall_ms.total, 1);
     }
@@ -122,6 +131,7 @@ mod tests {
             &s.cache_misses,
             &s.branch_misses,
             &s.wall_ms,
+            &s.peak_rss_kb,
         ] {
             assert_eq!(m.median, None);
             assert_eq!(m.min, None);
@@ -139,6 +149,7 @@ mod tests {
                 instructions: None,
                 cache_misses: None,
                 branch_misses: None,
+                peak_rss_kb: None,
                 wall_ms: 7.0,
             },
             RunSample {
@@ -146,6 +157,7 @@ mod tests {
                 instructions: None,
                 cache_misses: None,
                 branch_misses: None,
+                peak_rss_kb: None,
                 wall_ms: 9.0,
             },
         ];
@@ -154,8 +166,25 @@ mod tests {
         assert_eq!(s.instructions.valid, 0);
         assert_eq!(s.cache_misses.valid, 0);
         assert_eq!(s.branch_misses.valid, 0);
+        assert_eq!(s.peak_rss_kb.valid, 0);
         assert_eq!(s.wall_ms.valid, 2);
         assert_eq!(s.wall_ms.median, Some(8.0));
+    }
+
+    #[test]
+    fn missing_peak_rss_does_not_affect_other_metrics() {
+        let samples = vec![
+            RunSample {
+                peak_rss_kb: None,
+                ..full(100)
+            },
+            full(200),
+        ];
+        let s = summarize_all(&samples);
+        assert_eq!(s.peak_rss_kb.valid, 1);
+        assert_eq!(s.peak_rss_kb.median, Some(100.0));
+        assert_eq!(s.cycles.valid, 2);
+        assert_eq!(s.cycles.median, Some(150.0));
     }
 
     #[test]
@@ -167,6 +196,7 @@ mod tests {
         assert_eq!(s.cache_misses.total, 4);
         assert_eq!(s.branch_misses.total, 4);
         assert_eq!(s.wall_ms.total, 4);
+        assert_eq!(s.peak_rss_kb.total, 4);
     }
 
     #[test]
@@ -185,5 +215,6 @@ mod tests {
         assert_eq!(s.cycles.valid, 100);
         assert_eq!(s.cycles.total, 100);
         assert_eq!(s.wall_ms.median, Some(50.5));
+        assert_eq!(s.peak_rss_kb.median, Some(25.0));
     }
 }

@@ -8,6 +8,7 @@ pub enum Metric {
     CacheMisses,
     BranchMisses,
     WallMs,
+    PeakRssKb,
 }
 
 impl Metric {
@@ -18,6 +19,7 @@ impl Metric {
             Metric::CacheMisses => s.cache_misses.map(|v| v as f64),
             Metric::BranchMisses => s.branch_misses.map(|v| v as f64),
             Metric::WallMs => Some(s.wall_ms),
+            Metric::PeakRssKb => s.peak_rss_kb.map(|v| v as f64),
         }
     }
 
@@ -28,6 +30,7 @@ impl Metric {
             Metric::CacheMisses => "cache-misses",
             Metric::BranchMisses => "branch-misses",
             Metric::WallMs => "wall_ms",
+            Metric::PeakRssKb => "peak_rss_kb",
         }
     }
 }
@@ -68,6 +71,7 @@ mod tests {
             instructions: Some(100),
             cache_misses: Some(10),
             branch_misses: Some(5),
+            peak_rss_kb: Some(1000),
             wall_ms,
         }
     }
@@ -78,6 +82,7 @@ mod tests {
             instructions: Some(cycles * 2),
             cache_misses: Some(cycles / 10),
             branch_misses: Some(cycles / 100),
+            peak_rss_kb: Some(cycles / 2),
             wall_ms: cycles as f64,
         }
     }
@@ -127,6 +132,21 @@ mod tests {
     }
 
     #[test]
+    fn value_peak_rss_reads_peak_rss_field() {
+        let s = full(1000);
+        assert_eq!(Metric::PeakRssKb.value(&s), Some(500.0));
+    }
+
+    #[test]
+    fn value_peak_rss_none_when_missing() {
+        let s = RunSample {
+            peak_rss_kb: None,
+            ..full(1000)
+        };
+        assert_eq!(Metric::PeakRssKb.value(&s), None);
+    }
+
+    #[test]
     fn value_large_counter_keeps_precision_within_f64() {
         let big = 1u64 << 52;
         let s = sample(Some(big), 1.0);
@@ -142,6 +162,7 @@ mod tests {
         assert_eq!(Metric::CacheMisses.name(), "cache-misses");
         assert_eq!(Metric::BranchMisses.name(), "branch-misses");
         assert_eq!(Metric::WallMs.name(), "wall_ms");
+        assert_eq!(Metric::PeakRssKb.name(), "peak_rss_kb");
     }
 
     // ---------- metric_summary: expected behavior ----------
@@ -229,6 +250,16 @@ mod tests {
     }
 
     #[test]
+    fn peak_rss_is_summarized_as_median_across_runs() {
+        let samples = vec![full(100), full(300), full(200)];
+        let s = metric_summary(&samples, Metric::PeakRssKb);
+        assert_eq!(s.median, Some(100.0));
+        assert_eq!(s.min, Some(50.0));
+        assert_eq!(s.max, Some(150.0));
+        assert_eq!(s.valid, 3);
+    }
+
+    #[test]
     fn summary_only_reads_requested_metric() {
         let samples = vec![full(100), full(200)];
         let cycles = metric_summary(&samples, Metric::Cycles);
@@ -256,6 +287,24 @@ mod tests {
         assert_eq!(s.median, None);
         assert_eq!(s.min, None);
         assert_eq!(s.max, None);
+        assert_eq!(s.valid, 0);
+        assert_eq!(s.total, 2);
+    }
+
+    #[test]
+    fn peak_rss_missing_in_every_run_gives_no_statistics() {
+        let samples = vec![
+            RunSample {
+                peak_rss_kb: None,
+                ..full(10)
+            },
+            RunSample {
+                peak_rss_kb: None,
+                ..full(20)
+            },
+        ];
+        let s = metric_summary(&samples, Metric::PeakRssKb);
+        assert_eq!(s.median, None);
         assert_eq!(s.valid, 0);
         assert_eq!(s.total, 2);
     }

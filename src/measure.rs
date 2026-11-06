@@ -1,13 +1,15 @@
+use crate::memory::mem_usage_reader;
+use crate::{perf::perf, warmup::warm_up};
 use anyhow::{Ok, Result};
 use std::time::Instant;
 
-use crate::{perf::perf, warmup::warm_up};
 pub struct RunSample {
     pub cycles: Option<u64>,
     pub instructions: Option<u64>,
     pub cache_misses: Option<u64>,
     pub branch_misses: Option<u64>,
     pub wall_ms: f64,
+    pub peak_rss_kb: Option<u64>,
 }
 pub fn measure(warmup: u8, n: u16, args: &[String]) -> Result<Vec<RunSample>> {
     let mut samples_holder: Vec<RunSample> = vec![];
@@ -21,6 +23,7 @@ pub fn measure(warmup: u8, n: u16, args: &[String]) -> Result<Vec<RunSample>> {
             cache_misses: result.get("cache-misses").copied().flatten(),
             branch_misses: result.get("branch-misses").copied().flatten(),
             wall_ms: start.elapsed().as_secs_f64() * 1000.0,
+            peak_rss_kb: Some(mem_usage_reader(args)?),
         };
         samples_holder.push(sample);
     }
@@ -89,7 +92,8 @@ mod tests {
         let args = counting_args(&path);
         let samples = measure(2, 3, &args).unwrap();
         assert_eq!(samples.len(), 3);
-        assert_eq!(lines_in(&path), 5);
+        // 2 warm-up runs (perf only) + 3 measured runs, each under perf and under memory measurement.
+        assert_eq!(lines_in(&path), 2 + 2 * 3);
         let _ = fs::remove_file(&path);
     }
 
@@ -99,10 +103,10 @@ mod tests {
         let args = counting_args(&path);
         let samples = measure(0, 4, &args).unwrap();
         assert_eq!(samples.len(), 4);
-        assert_eq!(lines_in(&path), 4);
+        // Each measured run executes the command twice: once under perf, once for memory.
+        assert_eq!(lines_in(&path), 2 * 4);
         let _ = fs::remove_file(&path);
     }
-
     #[test]
     fn zero_measured_runs_still_runs_warmup() {
         let path = counter_file("warm_only");
