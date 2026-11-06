@@ -33,7 +33,7 @@ pub fn measure(warmup: u8, n: u16, args: &[String]) -> Result<Vec<RunSample>> {
 mod tests {
     use super::*;
     use std::fs;
-    use std::path::PathBuf;
+    use std::path::{Path, PathBuf};
 
     fn s(v: &str) -> String {
         v.to_string()
@@ -49,17 +49,15 @@ mod tests {
         let _ = fs::remove_file(&p);
         p
     }
-
-    fn counting_args(path: &PathBuf) -> Vec<String> {
+    fn counting_args(path: &Path) -> Vec<String> {
         vec![s("sh"), s("-c"), format!("echo run >> {}", path.display())]
     }
 
-    fn lines_in(path: &PathBuf) -> usize {
+    fn lines_in(path: &Path) -> usize {
         fs::read_to_string(path)
             .map(|t| t.lines().count())
             .unwrap_or(0)
     }
-
     // ---------- expected behavior ----------
 
     #[test]
