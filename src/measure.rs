@@ -41,12 +41,18 @@ mod tests {
 
     // Each call appends one line to this file, so the number of lines
     // equals the number of times perf actually ran the command.
+    use std::sync::atomic::{AtomicU32, Ordering};
+
+    static NEXT_ID: AtomicU32 = AtomicU32::new(0);
+
     fn counter_file(name: &str) -> PathBuf {
+        let id = NEXT_ID.fetch_add(1, Ordering::SeqCst);
         let mut p = std::env::temp_dir();
         p.push(format!(
-            "perflab_warmup_{}_{}.txt",
+            "perflab_{}_{}_{}.txt",
             name,
-            std::process::id()
+            std::process::id(),
+            id
         ));
         let _ = fs::remove_file(&p);
         p
