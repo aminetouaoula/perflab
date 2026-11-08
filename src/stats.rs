@@ -4,7 +4,6 @@ pub fn median(values: &mut [f64]) -> Option<f64> {
     } else {
         values.sort_by(|a, b| a.total_cmp(b));
         let mid = values.len() / 2;
-
         // if leng is even
         if values.len().is_multiple_of(2) {
             let result = (values[mid - 1] + values[mid]) / 2.0;

@@ -11,7 +11,7 @@ pub fn warm_up(n: u8, args: &[String]) -> Result<()> {
 mod tests {
     use super::*;
     use std::fs;
-    use std::path::PathBuf;
+    use std::path::{Path, PathBuf};
 
     fn s(v: &str) -> String {
         v.to_string()
@@ -30,15 +30,17 @@ mod tests {
         p
     }
 
-    fn counting_args(path: &PathBuf) -> Vec<String> {
+    fn counting_args(path: &Path) -> Vec<String> {
         vec![s("sh"), s("-c"), format!("echo run >> {}", path.display())]
     }
 
-    fn lines_in(path: &PathBuf) -> usize {
+    fn lines_in(path: &Path) -> usize {
         fs::read_to_string(path)
             .map(|t| t.lines().count())
             .unwrap_or(0)
     }
+
+    // ---------- expected behavior ----------
 
     #[test]
     fn zero_runs_returns_ok_and_runs_nothing() {
@@ -73,6 +75,14 @@ mod tests {
     }
 
     #[test]
+    fn warm_up_returns_unit_on_success() {
+        let result: Result<()> = warm_up(1, &[s("true")]);
+        assert!(result.is_ok());
+    }
+
+    // ---------- error behavior ----------
+
+    #[test]
     fn failing_command_returns_error() {
         assert!(warm_up(1, &[s("false")]).is_err());
     }
@@ -93,15 +103,7 @@ mod tests {
     }
 
     #[test]
-    fn zero_runs_with_empty_args_is_still_ok() {
-        // No perf call happens, so there is nothing to fail.
-        assert!(warm_up(0, &[]).is_ok());
-    }
-
-    #[test]
     fn failure_stops_the_loop_early() {
-        // The command fails on its first run, so perf is called only once,
-        // not three times. Check via a counter file that records each run.
         let path = counter_file("stop_early");
         let args = vec![
             s("sh"),
@@ -113,11 +115,16 @@ mod tests {
         let _ = fs::remove_file(&path);
     }
 
+    // ---------- edge cases ----------
+
     #[test]
-    fn warm_up_discards_counter_values_and_returns_only_unit() {
-        // The return type is Result<()>, so a successful warm-up
-        // produces no counter data for the caller to use.
-        let result: Result<()> = warm_up(1, &[s("true")]);
-        assert!(result.is_ok());
+    fn zero_runs_with_empty_args_is_still_ok() {
+        // No perf call happens, so there is nothing to fail.
+        assert!(warm_up(0, &[]).is_ok());
+    }
+
+    #[test]
+    fn zero_runs_with_failing_command_is_ok() {
+        assert!(warm_up(0, &[s("false")]).is_ok());
     }
 }
