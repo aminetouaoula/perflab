@@ -17,8 +17,6 @@ mod tests {
         v.to_string()
     }
 
-    // Each call appends one line to this file, so the number of lines
-    // equals the number of times perf actually ran the command.
     fn counter_file(name: &str) -> PathBuf {
         let mut p = std::env::temp_dir();
         p.push(format!(

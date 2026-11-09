@@ -1,5 +1,6 @@
 use crate::measure::RunSample;
 use crate::stats::median;
+use serde::Serialize;
 
 #[derive(Debug, Clone, Copy)]
 pub enum Metric {
@@ -35,7 +36,7 @@ impl Metric {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct MetricSummary {
     pub median: Option<f64>,
     pub min: Option<f64>,

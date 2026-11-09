@@ -2,6 +2,7 @@ pub mod measure;
 pub mod memory;
 pub mod perf;
 pub mod reader;
+pub mod report;
 pub mod runner;
 pub mod stats;
 pub mod summarize_all;

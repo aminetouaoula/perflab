@@ -1,7 +1,10 @@
+use serde::Serialize;
+
 use crate::{
     measure::RunSample,
     summary::{Metric, MetricSummary, metric_summary},
 };
+#[derive(Serialize)]
 pub struct Summary {
     pub cycles: MetricSummary,
     pub instructions: MetricSummary,
