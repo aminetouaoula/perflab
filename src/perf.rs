@@ -20,11 +20,13 @@ pub fn perf(args: &[String]) -> Result<BTreeMap<String, Option<u64>>> {
     full.push(program.clone());
     full.extend(rest.iter().cloned());
 
-    let output = Command::new("perf")
+    let output = Command::new("taskset")
+        .arg("-c")
+        .arg(core.to_string())
+        .arg("perf")
         .args(&full)
         .output()
-        .context("failed to start perf")?;
-
+        .context("failed to start taskset")?;
     if output.status.success() {
         let text = String::from_utf8(output.stderr)
             .context("perf produced output that is not valid UTF-8")?;
