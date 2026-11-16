@@ -30,7 +30,6 @@ fn percentile(sorted: &[f64], fraction: f64) -> f64 {
 }
 
 /// Bootstrap confidence interval for the median.
-
 pub fn bootstrap_median_ci(values: &[f64], resamples: u32, seed: u64) -> Option<(f64, f64)> {
     if values.is_empty() || resamples == 0 {
         return None;

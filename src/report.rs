@@ -108,8 +108,25 @@ mod tests {
             max,
             valid,
             total,
+            ci_low: None,
+            ci_high: None,
         }
     }
+
+    // fn m_with_ci(
+    //     median: Option<f64>,
+    //     min: Option<f64>,
+    //     max: Option<f64>,
+    //     valid: usize,
+    //     total: usize,
+    //     ci: (f64, f64),
+    // ) -> MetricSummary {
+    //     MetricSummary {
+    //         ci_low: Some(ci.0),
+    //         ci_high: Some(ci.1),
+    //         ..m(median, min, max, valid, total)
+    //     }
+    // }
 
     // Median, min and max all equal.
     fn metric(median: Option<f64>, valid: usize, total: usize) -> MetricSummary {
