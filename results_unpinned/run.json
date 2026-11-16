@@ -1,0 +1,50 @@
+{
+  "command": "sleep 0.1",
+  "warmup": 1,
+  "runs": 3,
+  "timestamp": 1794806335,
+  "summary": {
+    "cycles": {
+      "median": 344996.0,
+      "min": 320659.0,
+      "max": 352086.0,
+      "valid": 3,
+      "total": 3
+    },
+    "instructions": {
+      "median": 301752.0,
+      "min": 301748.0,
+      "max": 301984.0,
+      "valid": 3,
+      "total": 3
+    },
+    "cache_misses": {
+      "median": 7723.0,
+      "min": 7709.0,
+      "max": 7730.0,
+      "valid": 3,
+      "total": 3
+    },
+    "branch_misses": {
+      "median": 4746.0,
+      "min": 4648.0,
+      "max": 4797.0,
+      "valid": 3,
+      "total": 3
+    },
+    "wall_ms": {
+      "median": 109.314801,
+      "min": 109.173513,
+      "max": 109.623379,
+      "valid": 3,
+      "total": 3
+    },
+    "peak_rss_kb": {
+      "median": 4216.0,
+      "min": 4216.0,
+      "max": 4216.0,
+      "valid": 3,
+      "total": 3
+    }
+  }
+}

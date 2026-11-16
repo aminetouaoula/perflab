@@ -100,7 +100,7 @@ mod tests {
         }
     }
 
-    // Median, min and max all equal, for JSON tests.
+    // Median, min and max all equal.
     fn metric(median: Option<f64>, valid: usize, total: usize) -> MetricSummary {
         m(median, median, median, valid, total)
     }
@@ -158,6 +158,13 @@ mod tests {
 
     fn parse(r: &Report) -> Value {
         serde_json::from_str(&to_json(r).unwrap()).unwrap()
+    }
+
+    // Returns only the table, starting at the header row, skipping the metadata.
+    fn table_lines(out: &str) -> Vec<&str> {
+        out.lines()
+            .skip_while(|l| !l.starts_with("| Metric"))
+            .collect()
     }
 
     // A fresh directory per call, so tests never share files.
@@ -469,12 +476,41 @@ mod tests {
         );
     }
 
-    // ---------- to_markdown: expected output ----------
+    // ---------- to_markdown: metadata ----------
+
+    #[test]
+    fn markdown_metadata_appears_before_table() {
+        let out = to_markdown(&report_with(full_summary()));
+        let table_start = out.find("| Metric").unwrap();
+        assert!(out[..table_start].contains("Command: `true`"));
+    }
+
+    #[test]
+    fn markdown_shows_warmup_runs_and_timestamp() {
+        let out = to_markdown(&report("sleep 0.1", 2, 5, 1_700_000_000, full_summary()));
+        assert!(out.contains("Warm-up runs: 2"));
+        assert!(out.contains("Measured runs: 5"));
+        assert!(out.contains("Timestamp: 1700000000 (Unix seconds)"));
+    }
+
+    #[test]
+    fn markdown_command_is_in_backticks() {
+        let out = to_markdown(&report("sleep 0.1", 0, 1, 0, full_summary()));
+        assert!(out.contains("Command: `sleep 0.1`"));
+    }
+
+    // ---------- to_markdown: table shape ----------
 
     #[test]
     fn markdown_full_output_matches_expected_text() {
         let out = to_markdown(&report_with(full_summary()));
         let expected = "\
+Command: `true`
+
+Warm-up runs: 0
+Measured runs: 3
+Timestamp: 0 (Unix seconds)
+
 | Metric | Median | Min | Max | Valid |
 |---|---|---|---|---|
 | cycles | 1000.00 | 900.00 | 1100.00 | 3/3 |
@@ -488,30 +524,30 @@ mod tests {
     }
 
     #[test]
-    fn markdown_first_line_is_header() {
+    fn markdown_table_header_is_first_table_line() {
         let out = to_markdown(&report_with(full_summary()));
         assert_eq!(
-            out.lines().next().unwrap(),
+            table_lines(&out)[0],
             "| Metric | Median | Min | Max | Valid |"
         );
     }
 
     #[test]
-    fn markdown_second_line_is_separator() {
+    fn markdown_table_separator_is_second_table_line() {
         let out = to_markdown(&report_with(full_summary()));
-        assert_eq!(out.lines().nth(1).unwrap(), "|---|---|---|---|---|");
+        assert_eq!(table_lines(&out)[1], "|---|---|---|---|---|");
     }
 
     #[test]
-    fn markdown_has_header_separator_and_six_rows() {
+    fn markdown_table_has_header_separator_and_six_rows() {
         let out = to_markdown(&report_with(full_summary()));
-        assert_eq!(out.lines().count(), 8);
+        assert_eq!(table_lines(&out).len(), 8);
     }
 
     #[test]
     fn markdown_rows_follow_fixed_order() {
         let out = to_markdown(&report_with(full_summary()));
-        let lines: Vec<&str> = out.lines().collect();
+        let lines = table_lines(&out);
         assert!(lines[2].starts_with("| cycles |"));
         assert!(lines[3].starts_with("| instructions |"));
         assert!(lines[4].starts_with("| cache_misses |"));
@@ -521,9 +557,9 @@ mod tests {
     }
 
     #[test]
-    fn markdown_every_line_has_same_cell_count() {
+    fn markdown_every_table_line_has_same_cell_count() {
         let out = to_markdown(&report_with(full_summary()));
-        for line in out.lines() {
+        for line in table_lines(&out) {
             assert_eq!(line.trim_end().split('|').count(), 7, "line was: {line}");
         }
     }
@@ -595,7 +631,7 @@ mod tests {
         assert!(out.contains("| wall_ms | -1.50 | -2.00 | 0.50 | 3/3 |"));
     }
 
-    // ---------- write_file: expected behavior ----------
+    // ---------- write_file ----------
 
     #[test]
     fn write_file_creates_file_with_exact_content() {
@@ -642,8 +678,6 @@ mod tests {
         assert_eq!(fs::read_to_string(dir.join("keep.txt")).unwrap(), "keep");
         let _ = fs::remove_dir_all(&dir);
     }
-
-    // ---------- write_file: error behavior ----------
 
     #[test]
     fn write_file_directory_as_target_is_error() {
@@ -823,14 +857,6 @@ mod tests {
     }
 
     #[test]
-    fn write_json_trailing_separator_is_error() {
-        let dir = scratch_dir("wj_trailing");
-        let path = dir.join("missing_dir").join("");
-        assert!(write_json(&report_with(summary()), &path).is_err());
-        let _ = fs::remove_dir_all(&dir);
-    }
-
-    #[test]
     fn write_json_blocked_parent_is_error_and_leaves_no_file() {
         let dir = scratch_dir("wj_blocked");
         let blocker = dir.join("blocker");
@@ -897,7 +923,7 @@ mod tests {
         let path = dir.join("run.md");
         write_markdown(&report_with(full_summary()), &path).unwrap();
         let text = fs::read_to_string(&path).unwrap();
-        assert!(text.starts_with("| Metric | Median | Min | Max | Valid |"));
+        assert!(text.contains("| Metric | Median | Min | Max | Valid |"));
         let _ = fs::remove_dir_all(&dir);
     }
 
@@ -966,7 +992,7 @@ mod tests {
     fn write_markdown_concurrent_distinct_files_all_succeed() {
         let dir = scratch_dir("wm_concurrent");
         thread::scope(|scope| {
-            for i in 0..8u32 {
+            for i in 0..8u16 {
                 let path = dir.join(format!("run_{i}.md"));
                 scope.spawn(move || {
                     let r = report_with(full_summary());

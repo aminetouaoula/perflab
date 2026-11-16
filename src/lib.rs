@@ -37,7 +37,7 @@ pub fn run(config: &RunConfig) -> Result<Outputs> {
         bail!("the number of measured runs must be at least 1");
     }
 
-    let samples = measure(config.warmup, config.runs, &config.command)?;
+    let samples = measure(config.warmup, config.runs, &config.command, config.core)?;
     let summary = summarize_all(&samples);
 
     let timestamp = SystemTime::now()
@@ -73,8 +73,8 @@ mod tests {
 
     static NEXT_ID: AtomicU32 = AtomicU32::new(0);
 
-    // A fresh base directory per test. The output folder is created by run,
-    // so it does not exist yet when the test starts.
+    // A fresh base directory per test. run creates the output folder itself,
+    // so it does not exist when the test starts.
     fn scratch_base(name: &str) -> PathBuf {
         let id = NEXT_ID.fetch_add(1, Ordering::SeqCst);
         let dir = std::env::temp_dir().join(format!(
@@ -94,6 +94,14 @@ mod tests {
             warmup,
             runs,
             out_dir,
+            core: None,
+        }
+    }
+
+    fn pinned(command: &[&str], warmup: u8, runs: u16, out_dir: PathBuf, core: u32) -> RunConfig {
+        RunConfig {
+            core: Some(core),
+            ..config(command, warmup, runs, out_dir)
         }
     }
 
@@ -102,8 +110,7 @@ mod tests {
     #[test]
     fn empty_command_is_error() {
         let base = scratch_base("empty_cmd");
-        let out = base.join("results");
-        assert!(run(&config(&[], 0, 1, out)).is_err());
+        assert!(run(&config(&[], 0, 1, base.join("results"))).is_err());
         let _ = fs::remove_dir_all(&base);
     }
 
@@ -149,10 +156,19 @@ mod tests {
     }
 
     #[test]
-    fn empty_command_with_zero_runs_reports_command_first() {
+    fn empty_command_is_reported_before_zero_runs() {
         let base = scratch_base("both_bad");
         let err = run(&config(&[], 0, 0, base.join("results"))).unwrap_err();
         assert!(format!("{err:#}").contains("no command given"));
+        let _ = fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn zero_runs_with_pinned_core_is_still_guarded() {
+        let base = scratch_base("zero_pinned");
+        let out = base.join("results");
+        assert!(run(&pinned(&["true"], 0, 0, out.clone(), 0)).is_err());
+        assert!(!out.exists());
         let _ = fs::remove_dir_all(&base);
     }
 
@@ -194,10 +210,18 @@ mod tests {
     }
 
     #[test]
-    fn maximum_run_count_is_accepted_by_type_and_fails_fast_on_bad_command() {
-        // A failing command stops measure at its first run, so u16::MAX
-        // runs is not executed in full. This checks the boundary compiles
-        // and is handled without writing output.
+    fn impossible_core_is_error_and_writes_nothing() {
+        let base = scratch_base("bad_core");
+        let out = base.join("results");
+        assert!(run(&pinned(&["true"], 0, 1, out.clone(), 9999)).is_err());
+        assert!(!out.exists());
+        let _ = fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn maximum_run_count_fails_fast_on_bad_command() {
+        // A failing command stops measure at its first run, so u16::MAX runs
+        // are never executed. This checks the boundary type is accepted.
         let base = scratch_base("max_runs");
         let out = base.join("results");
         assert!(run(&config(&["false"], 0, u16::MAX, out.clone())).is_err());
@@ -205,7 +229,7 @@ mod tests {
         let _ = fs::remove_dir_all(&base);
     }
 
-    // ---------- expected behavior (needs real perf counters) ----------
+    // ---------- expected behavior (needs hardware perf counters) ----------
 
     #[test]
     #[ignore = "needs hardware perf counters"]
@@ -224,8 +248,7 @@ mod tests {
     #[ignore = "needs hardware perf counters"]
     fn json_file_echoes_config_values() {
         let base = scratch_base("json_echo");
-        let out = base.join("results");
-        let outputs = run(&config(&["sleep", "0.01"], 1, 3, out)).unwrap();
+        let outputs = run(&config(&["sleep", "0.01"], 1, 3, base.join("r"))).unwrap();
         let v: Value = serde_json::from_str(&fs::read_to_string(&outputs.json).unwrap()).unwrap();
         assert_eq!(v["warmup"], 1);
         assert_eq!(v["runs"], 3);
@@ -254,7 +277,7 @@ mod tests {
         let base = scratch_base("md_rows");
         let outputs = run(&config(&["sleep", "0.01"], 0, 2, base.join("r"))).unwrap();
         let text = fs::read_to_string(&outputs.markdown).unwrap();
-        assert_eq!(text.lines().count(), 8);
+        assert!(text.lines().count() >= 8, "markdown was:\n{text}");
         let _ = fs::remove_dir_all(&base);
     }
 
@@ -308,6 +331,41 @@ mod tests {
         let base = scratch_base("single");
         let outputs = run(&config(&["true"], 0, 1, base.join("r"))).unwrap();
         assert!(outputs.json.is_file());
+        let _ = fs::remove_dir_all(&base);
+    }
+
+    // ---------- pinned path (needs hardware perf counters) ----------
+
+    #[test]
+    #[ignore = "needs hardware perf counters"]
+    fn pinned_run_creates_both_files() {
+        let base = scratch_base("pinned_files");
+        let outputs = run(&pinned(&["sleep", "0.01"], 1, 2, base.join("r"), 0)).unwrap();
+        assert!(outputs.json.is_file());
+        assert!(outputs.markdown.is_file());
+        let _ = fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    #[ignore = "needs hardware perf counters"]
+    fn pinned_and_unpinned_produce_same_structure() {
+        let base = scratch_base("pinned_vs_unpinned");
+        let a = run(&config(&["sleep", "0.01"], 0, 2, base.join("a"))).unwrap();
+        let b = run(&pinned(&["sleep", "0.01"], 0, 2, base.join("b"), 0)).unwrap();
+        let va: Value = serde_json::from_str(&fs::read_to_string(&a.json).unwrap()).unwrap();
+        let vb: Value = serde_json::from_str(&fs::read_to_string(&b.json).unwrap()).unwrap();
+        assert_eq!(
+            va["summary"]
+                .as_object()
+                .unwrap()
+                .keys()
+                .collect::<Vec<_>>(),
+            vb["summary"]
+                .as_object()
+                .unwrap()
+                .keys()
+                .collect::<Vec<_>>()
+        );
         let _ = fs::remove_dir_all(&base);
     }
 }

@@ -2,47 +2,47 @@
   "command": "sleep 0.1",
   "warmup": 1,
   "runs": 3,
-  "timestamp": 1794388056,
+  "timestamp": 1794806301,
   "summary": {
     "cycles": {
-      "median": 329927.0,
-      "min": 304341.0,
-      "max": 343759.0,
+      "median": 316240.0,
+      "min": 314577.0,
+      "max": 337805.0,
       "valid": 3,
       "total": 3
     },
     "instructions": {
-      "median": 301791.0,
-      "min": 301790.0,
-      "max": 301817.0,
+      "median": 301775.0,
+      "min": 301752.0,
+      "max": 301776.0,
       "valid": 3,
       "total": 3
     },
     "cache_misses": {
-      "median": 8025.0,
-      "min": 7930.0,
-      "max": 8111.0,
+      "median": 7761.0,
+      "min": 7743.0,
+      "max": 7922.0,
       "valid": 3,
       "total": 3
     },
     "branch_misses": {
-      "median": 4695.0,
-      "min": 4550.0,
-      "max": 4732.0,
+      "median": 4711.0,
+      "min": 4659.0,
+      "max": 4739.0,
       "valid": 3,
       "total": 3
     },
     "wall_ms": {
-      "median": 109.2011,
-      "min": 109.060208,
-      "max": 109.30234,
+      "median": 108.926051,
+      "min": 108.63772300000001,
+      "max": 109.46476700000001,
       "valid": 3,
       "total": 3
     },
     "peak_rss_kb": {
-      "median": 4124.0,
-      "min": 4124.0,
-      "max": 4124.0,
+      "median": 4232.0,
+      "min": 4232.0,
+      "max": 4232.0,
       "valid": 3,
       "total": 3
     }
