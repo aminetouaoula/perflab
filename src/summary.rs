@@ -3,6 +3,8 @@ use crate::stats::{bootstrap_median_ci, median};
 use serde::Serialize;
 const CI_RESAMPLES: u32 = 10_000;
 const CI_SEED: u64 = 0x5EED_CAFE;
+
+const NOISE_THRESHOLD: f64 = 0.05;
 #[derive(Debug, Clone, Copy)]
 pub enum Metric {
     Cycles,
@@ -46,8 +48,20 @@ pub struct MetricSummary {
     pub total: usize,
     pub ci_low: Option<f64>,
     pub ci_high: Option<f64>,
+    pub noisy: bool,
 }
-
+fn is_noisy(median: Option<f64>, min: Option<f64>, max: Option<f64>) -> bool {
+    match (median, min, max) {
+        (Some(med), Some(lo), Some(hi)) => {
+            if med == 0.0 {
+                hi - lo > 0.0
+            } else {
+                (hi - lo) / med.abs() > NOISE_THRESHOLD
+            }
+        }
+        _ => false,
+    }
+}
 pub fn metric_summary(samples: &[RunSample], metric: Metric) -> MetricSummary {
     let mut values: Vec<f64> = samples.iter().filter_map(|s| metric.value(s)).collect();
 
@@ -69,6 +83,7 @@ pub fn metric_summary(samples: &[RunSample], metric: Metric) -> MetricSummary {
         total,
         ci_low,
         ci_high,
+        noisy: is_noisy(med, min, max),
     }
 }
 
