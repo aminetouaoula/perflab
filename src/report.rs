@@ -22,19 +22,30 @@ fn fmt_value(v: Option<f64>) -> String {
         None => "-".to_string(),
     }
 }
-
+fn median_cell(m: &MetricSummary) -> String {
+    match (m.median, m.ci_low, m.ci_high) {
+        (Some(med), Some(lo), Some(hi)) => {
+            format!(
+                "{} [{}, {}]",
+                fmt_value(Some(med)),
+                fmt_value(Some(lo)),
+                fmt_value(Some(hi))
+            )
+        }
+        _ => fmt_value(m.median),
+    }
+}
 fn row(name: &str, m: &MetricSummary) -> String {
     format!(
         "| {} | {} | {} | {} | {}/{} |\n",
         name,
-        fmt_value(m.median),
+        median_cell(m),
         fmt_value(m.min),
         fmt_value(m.max),
         m.valid,
         m.total
     )
 }
-
 pub fn to_markdown(report: &Report) -> String {
     let s = &report.summary;
     let mut out = String::new();

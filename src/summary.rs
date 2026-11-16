@@ -1,7 +1,8 @@
 use crate::measure::RunSample;
-use crate::stats::median;
+use crate::stats::{bootstrap_median_ci, median};
 use serde::Serialize;
-
+const CI_RESAMPLES: u32 = 10_000;
+const CI_SEED: u64 = 0x5EED_CAFE;
 #[derive(Debug, Clone, Copy)]
 pub enum Metric {
     Cycles,
@@ -43,6 +44,8 @@ pub struct MetricSummary {
     pub max: Option<f64>,
     pub valid: usize,
     pub total: usize,
+    pub ci_low: Option<f64>,
+    pub ci_high: Option<f64>,
 }
 
 pub fn metric_summary(samples: &[RunSample], metric: Metric) -> MetricSummary {
@@ -52,6 +55,10 @@ pub fn metric_summary(samples: &[RunSample], metric: Metric) -> MetricSummary {
     let total = samples.len();
     let min = values.iter().copied().reduce(f64::min);
     let max = values.iter().copied().reduce(f64::max);
+    let (ci_low, ci_high) = match bootstrap_median_ci(&values, CI_RESAMPLES, CI_SEED) {
+        Some((low, high)) => (Some(low), Some(high)),
+        None => (None, None),
+    };
     let med = median(&mut values);
 
     MetricSummary {
@@ -60,8 +67,11 @@ pub fn metric_summary(samples: &[RunSample], metric: Metric) -> MetricSummary {
         max,
         valid,
         total,
+        ci_low,
+        ci_high,
     }
 }
+
 #[cfg(test)]
 mod tests {
     use super::*;
