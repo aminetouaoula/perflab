@@ -95,6 +95,7 @@ mod tests {
 
     // ---------- helpers ----------
 
+    // A metric that is not noisy and has no interval.
     fn m(
         median: Option<f64>,
         min: Option<f64>,
@@ -110,25 +111,25 @@ mod tests {
             total,
             ci_low: None,
             ci_high: None,
+            noisy: false,
         }
     }
 
-    // fn m_with_ci(
-    //     median: Option<f64>,
-    //     min: Option<f64>,
-    //     max: Option<f64>,
-    //     valid: usize,
-    //     total: usize,
-    //     ci: (f64, f64),
-    // ) -> MetricSummary {
-    //     MetricSummary {
-    //         ci_low: Some(ci.0),
-    //         ci_high: Some(ci.1),
-    //         ..m(median, min, max, valid, total)
-    //     }
-    // }
+    // The same metric, flagged as noisy.
+    fn m_noisy(
+        median: Option<f64>,
+        min: Option<f64>,
+        max: Option<f64>,
+        valid: usize,
+        total: usize,
+    ) -> MetricSummary {
+        MetricSummary {
+            noisy: true,
+            ..m(median, min, max, valid, total)
+        }
+    }
 
-    // Median, min and max all equal.
+    // Median, min and max all equal, not noisy.
     fn metric(median: Option<f64>, valid: usize, total: usize) -> MetricSummary {
         m(median, median, median, valid, total)
     }
@@ -255,6 +256,36 @@ mod tests {
     }
 
     #[test]
+    fn json_metric_has_noisy_flag() {
+        let v = parse(&report_with(summary()));
+        assert!(v["summary"]["cycles"].get("noisy").is_some());
+    }
+
+    #[test]
+    fn json_not_noisy_metric_is_written_as_false() {
+        let v = parse(&report_with(summary()));
+        assert_eq!(v["summary"]["cycles"]["noisy"], false);
+    }
+
+    #[test]
+    fn json_noisy_metric_is_written_as_true() {
+        let mut s = summary();
+        s.cycles = m_noisy(Some(1000.0), Some(900.0), Some(1100.0), 3, 3);
+        let v = parse(&report_with(s));
+        assert_eq!(v["summary"]["cycles"]["noisy"], true);
+    }
+
+    #[test]
+    fn json_noisy_flag_does_not_change_other_fields() {
+        let mut s = summary();
+        s.cycles = m_noisy(Some(1000.0), Some(900.0), Some(1100.0), 3, 3);
+        let v = parse(&report_with(s));
+        assert_eq!(v["summary"]["cycles"]["median"], 1000.0);
+        assert_eq!(v["summary"]["cycles"]["min"], 900.0);
+        assert_eq!(v["summary"]["cycles"]["max"], 1100.0);
+    }
+
+    #[test]
     fn json_fractional_medians_keep_decimals() {
         let v = parse(&report_with(summary()));
         assert_eq!(v["summary"]["wall_ms"]["median"], 12.5);
@@ -293,6 +324,14 @@ mod tests {
         let v = parse(&report("true", 0, 3, 0, s));
         assert_eq!(v["summary"]["cycles"]["valid"], 0);
         assert_eq!(v["summary"]["cycles"]["total"], 3);
+    }
+
+    #[test]
+    fn json_missing_metric_is_not_noisy() {
+        let mut s = summary();
+        s.cycles = empty(3);
+        let v = parse(&report("true", 0, 3, 0, s));
+        assert_eq!(v["summary"]["cycles"]["noisy"], false);
     }
 
     #[test]
@@ -504,6 +543,27 @@ mod tests {
         );
     }
 
+    // ---------- row: noisy marker ----------
+
+    #[test]
+    fn row_noisy_metric_shows_marker_after_median() {
+        let r = row("cycles", &m_noisy(Some(1.0), Some(0.5), Some(2.0), 3, 3));
+        assert_eq!(r, "| cycles | 1.00 ! | 0.50 | 2.00 | 3/3 |\n");
+    }
+
+    #[test]
+    fn row_noisy_empty_metric_has_no_marker() {
+        // A missing median cannot be noisy, so no marker is added to the dash.
+        let r = row("cycles", &m_noisy(None, None, None, 0, 3));
+        assert_eq!(r, "| cycles | - | - | - | 0/3 |\n");
+    }
+
+    #[test]
+    fn row_noisy_marker_does_not_change_min_or_max() {
+        let r = row("cycles", &m_noisy(Some(1.0), Some(0.5), Some(2.0), 3, 3));
+        assert!(r.contains("| 0.50 | 2.00 |"), "row was: {r}");
+    }
+
     // ---------- to_markdown: metadata ----------
 
     #[test]
@@ -601,6 +661,52 @@ Timestamp: 0 (Unix seconds)
     fn markdown_is_deterministic() {
         let r = report_with(full_summary());
         assert_eq!(to_markdown(&r), to_markdown(&r));
+    }
+
+    // ---------- to_markdown: noisy flag ----------
+
+    #[test]
+    fn markdown_noisy_metric_has_marker_and_others_do_not() {
+        let mut s = full_summary();
+        s.cycles = m_noisy(Some(1000.0), Some(900.0), Some(1100.0), 3, 3);
+        let out = to_markdown(&report_with(s));
+        let lines = table_lines(&out);
+        assert!(lines[2].contains("1000.00 !"), "row was: {}", lines[2]);
+        assert_eq!(out.matches('!').count(), 1);
+    }
+
+    #[test]
+    fn markdown_noisy_marker_keeps_row_cell_count() {
+        let mut s = full_summary();
+        s.cycles = m_noisy(Some(1000.0), Some(900.0), Some(1100.0), 3, 3);
+        let out = to_markdown(&report_with(s));
+        for line in table_lines(&out) {
+            assert_eq!(line.trim_end().split('|').count(), 7, "line was: {line}");
+        }
+    }
+
+    #[test]
+    fn markdown_all_noisy_has_one_marker_per_row() {
+        let noisy = |median: f64| m_noisy(Some(median), Some(median), Some(median), 3, 3);
+        let s = Summary {
+            cycles: noisy(1000.0),
+            instructions: noisy(2000.0),
+            cache_misses: noisy(100.0),
+            branch_misses: noisy(10.0),
+            wall_ms: noisy(12.5),
+            peak_rss_kb: noisy(3660.0),
+        };
+        let out = to_markdown(&report_with(s));
+        assert_eq!(out.matches('!').count(), 6);
+    }
+
+    #[test]
+    fn markdown_noisy_missing_metric_shows_no_marker() {
+        let mut s = full_summary();
+        s.cycles = m_noisy(None, None, None, 0, 3);
+        let out = to_markdown(&report_with(s));
+        assert!(out.contains("| cycles | - | - | - | 0/3 |"));
+        assert_eq!(out.matches('!').count(), 0);
     }
 
     // ---------- to_markdown: missing values ----------
@@ -797,6 +903,18 @@ Timestamp: 0 (Unix seconds)
     }
 
     #[test]
+    fn write_json_file_contains_noisy_flag() {
+        let dir = scratch_dir("wj_noisy");
+        let path = dir.join("run.json");
+        let mut s = summary();
+        s.cycles = m_noisy(Some(1000.0), Some(900.0), Some(1100.0), 3, 3);
+        write_json(&report_with(s), &path).unwrap();
+        let v: Value = serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+        assert_eq!(v["summary"]["cycles"]["noisy"], true);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn write_json_creates_missing_parent() {
         let dir = scratch_dir("wj_parent");
         let path = dir.join("results").join("run.json");
@@ -929,6 +1047,18 @@ Timestamp: 0 (Unix seconds)
         let dir = scratch_dir("wm_exact");
         let path = dir.join("run.md");
         let r = report_with(full_summary());
+        write_markdown(&r, &path).unwrap();
+        assert_eq!(fs::read_to_string(&path).unwrap(), to_markdown(&r));
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn write_markdown_file_with_noisy_metric_matches_to_markdown() {
+        let dir = scratch_dir("wm_noisy");
+        let path = dir.join("run.md");
+        let mut s = full_summary();
+        s.cycles = m_noisy(Some(1000.0), Some(900.0), Some(1100.0), 3, 3);
+        let r = report_with(s);
         write_markdown(&r, &path).unwrap();
         assert_eq!(fs::read_to_string(&path).unwrap(), to_markdown(&r));
         let _ = fs::remove_dir_all(&dir);

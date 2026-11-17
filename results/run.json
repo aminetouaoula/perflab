@@ -1,50 +1,68 @@
 {
   "command": "sleep 0.1",
   "warmup": 1,
-  "runs": 3,
-  "timestamp": 1794806301,
+  "runs": 14,
+  "timestamp": 1794918324,
   "summary": {
     "cycles": {
-      "median": 316240.0,
-      "min": 314577.0,
-      "max": 337805.0,
-      "valid": 3,
-      "total": 3
+      "median": 317637.5,
+      "min": 301869.0,
+      "max": 339374.0,
+      "valid": 14,
+      "total": 14,
+      "ci_low": 305831.5,
+      "ci_high": 326383.0,
+      "noisy": true
     },
     "instructions": {
-      "median": 301775.0,
-      "min": 301752.0,
-      "max": 301776.0,
-      "valid": 3,
-      "total": 3
+      "median": 303256.0,
+      "min": 303252.0,
+      "max": 303296.0,
+      "valid": 14,
+      "total": 14,
+      "ci_low": 303253.0,
+      "ci_high": 303277.0,
+      "noisy": false
     },
     "cache_misses": {
-      "median": 7761.0,
-      "min": 7743.0,
-      "max": 7922.0,
-      "valid": 3,
-      "total": 3
+      "median": 7735.0,
+      "min": 7634.0,
+      "max": 7921.0,
+      "valid": 14,
+      "total": 14,
+      "ci_low": 7697.5,
+      "ci_high": 7779.0,
+      "noisy": false
     },
     "branch_misses": {
-      "median": 4711.0,
-      "min": 4659.0,
-      "max": 4739.0,
-      "valid": 3,
-      "total": 3
+      "median": 4746.0,
+      "min": 4670.0,
+      "max": 4783.0,
+      "valid": 14,
+      "total": 14,
+      "ci_low": 4722.0,
+      "ci_high": 4768.0,
+      "noisy": false
     },
     "wall_ms": {
-      "median": 108.926051,
-      "min": 108.63772300000001,
-      "max": 109.46476700000001,
-      "valid": 3,
-      "total": 3
+      "median": 109.17158649999999,
+      "min": 108.212273,
+      "max": 115.77874800000001,
+      "valid": 14,
+      "total": 14,
+      "ci_low": 108.52972600000001,
+      "ci_high": 109.56297950000001,
+      "noisy": true
     },
     "peak_rss_kb": {
-      "median": 4232.0,
-      "min": 4232.0,
-      "max": 4232.0,
-      "valid": 3,
-      "total": 3
+      "median": 4280.0,
+      "min": 4280.0,
+      "max": 4280.0,
+      "valid": 14,
+      "total": 14,
+      "ci_low": 4280.0,
+      "ci_high": 4280.0,
+      "noisy": false
     }
   }
 }
