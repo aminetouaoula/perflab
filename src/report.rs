@@ -23,7 +23,7 @@ fn fmt_value(v: Option<f64>) -> String {
     }
 }
 fn median_cell(m: &MetricSummary) -> String {
-    match (m.median, m.ci_low, m.ci_high) {
+    let base = match (m.median, m.ci_low, m.ci_high) {
         (Some(med), Some(lo), Some(hi)) => {
             format!(
                 "{} [{}, {}]",
@@ -33,6 +33,11 @@ fn median_cell(m: &MetricSummary) -> String {
             )
         }
         _ => fmt_value(m.median),
+    };
+    if m.noisy && m.median.is_some() {
+        format!("{base} !")
+    } else {
+        base
     }
 }
 fn row(name: &str, m: &MetricSummary) -> String {
